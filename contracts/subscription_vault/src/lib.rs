@@ -88,6 +88,7 @@ impl SubscriptionVault {
         env.storage().persistent().set(&DataKey::Subscription(key), &details);
     }
 
+    #[allow(deprecated)]
     pub fn charge(env: Env, merchant: Address, user: Address) {
         merchant.require_auth();
 
@@ -133,6 +134,12 @@ impl SubscriptionVault {
         let token_address: Address = env.storage().instance().get(&DataKey::Token).unwrap();
         let token_client = soroban_sdk::token::TokenClient::new(&env, &token_address);
         token_client.transfer(&env.current_contract_address(), &merchant, &sub.amount);
+
+        // Emit charge_successful event
+        env.events().publish(
+            (soroban_sdk::Symbol::new(&env, "charge_successful"), merchant.clone(), user.clone()),
+            sub.amount,
+        );
 
         // Update subscription details
         sub.last_pull_timestamp = env.ledger().timestamp();
