@@ -5,7 +5,7 @@ import { signTransaction } from "@stellar/freighter-api";
 const RPC_URL = "https://soroban-testnet.stellar.org";
 const server = new rpc.Server(RPC_URL);
 
-export function useSubscriptionVault(publicKey: string | null) {
+export function useSubscriptionVault(publicKey: string | null, isSandbox: boolean = false) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -42,6 +42,36 @@ export function useSubscriptionVault(publicKey: string | null) {
     setError(null);
     setSuccessMessage(null);
 
+    // Save record to local list on success helper
+    const saveLocalRecord = () => {
+      if (typeof window !== "undefined") {
+        const keyName = `pullpay_subs_${publicKey}`;
+        const stored = localStorage.getItem(keyName) || "[]";
+        try {
+          const parsed = JSON.parse(stored);
+          const filtered = parsed.filter((sub: any) => sub.merchant !== merchantAddress);
+          filtered.push({ merchant: merchantAddress, amount, interval, contractId });
+          localStorage.setItem(keyName, JSON.stringify(filtered));
+          window.dispatchEvent(new CustomEvent("pullpay_subs_updated"));
+        } catch (e) {
+          console.error("Failed to save local subscription cache", e);
+        }
+      }
+    };
+
+    if (isSandbox) {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        saveLocalRecord();
+        setSuccessMessage("Hooray! Subscribed successfully (Sandbox Mock Tx)!");
+      } catch (err: any) {
+        setError(err.message || "Failed to submit simulated subscription");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     try {
       // 1. Fetch account sequence
       const sourceAccount = await server.getAccount(publicKey);
@@ -65,7 +95,7 @@ export function useSubscriptionVault(publicKey: string | null) {
         .setTimeout(30)
         .build();
 
-      // 4. Prepare transaction (simulates and updates resources/fees)
+      // 4. Prepare transaction
       tx = await server.prepareTransaction(tx);
 
       // 5. Sign with Freighter wallet
@@ -83,6 +113,7 @@ export function useSubscriptionVault(publicKey: string | null) {
 
       // 7. Poll for results
       await pollTransaction(sendResponse.hash);
+      saveLocalRecord();
       setSuccessMessage("Hooray! Subscribed successfully!");
     } catch (err: any) {
       setError(err.message || "Failed to submit subscription transaction");
@@ -103,6 +134,35 @@ export function useSubscriptionVault(publicKey: string | null) {
     setLoading(true);
     setError(null);
     setSuccessMessage(null);
+
+    if (isSandbox) {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+
+        // Create a mock event log and append to local storage
+        const mockEvent = {
+          id: `mock_tx_${Math.random().toString(36).substring(2, 11)}`,
+          ledger: Math.floor(Math.random() * 1200) + 145000,
+          topics: ["charge_successful", merchantAddress, userAddress],
+          value: "10000000",
+        };
+
+        if (typeof window !== "undefined") {
+          const stored = localStorage.getItem("pullpay_mock_events") || "[]";
+          const parsed = JSON.parse(stored);
+          parsed.unshift(mockEvent); // Show latest first
+          localStorage.setItem("pullpay_mock_events", JSON.stringify(parsed));
+          window.dispatchEvent(new CustomEvent("pullpay_mock_event_added"));
+        }
+
+        setSuccessMessage("Boom! Charged that customer successfully (Sandbox Mock Tx)!");
+      } catch (err: any) {
+        setError(err.message || "Failed to submit simulated charge");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     try {
       // 1. Fetch account sequence
@@ -151,9 +211,90 @@ export function useSubscriptionVault(publicKey: string | null) {
     }
   };
 
+  const cancel = async (
+    contractId: string,
+    merchantAddress: string
+  ) => {
+    if (!publicKey) {
+      setError("Please connect your wallet first!");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    const deleteLocalRecord = () => {
+      if (typeof window !== "undefined") {
+        const keyName = `pullpay_subs_${publicKey}`;
+        const stored = localStorage.getItem(keyName) || "[]";
+        try {
+          const parsed = JSON.parse(stored);
+          const filtered = parsed.filter((sub: any) => sub.merchant !== merchantAddress);
+          localStorage.setItem(keyName, JSON.stringify(filtered));
+          window.dispatchEvent(new CustomEvent("pullpay_subs_updated"));
+        } catch (e) {
+          console.error("Failed to delete local subscription cache", e);
+        }
+      }
+    };
+
+    if (isSandbox) {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        deleteLocalRecord();
+        setSuccessMessage("Cancelled subscription successfully (Sandbox Mock Tx)!");
+      } catch (err: any) {
+        setError(err.message || "Failed to cancel simulated subscription");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    try {
+      const sourceAccount = await server.getAccount(publicKey);
+      const contract = new Contract(contractId);
+      const operation = contract.call(
+        "cancel",
+        new Address(publicKey).toScVal(),
+        new Address(merchantAddress).toScVal()
+      );
+
+      let tx = new TransactionBuilder(sourceAccount, {
+        fee: "100",
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(operation)
+        .setTimeout(30)
+        .build();
+
+      tx = await server.prepareTransaction(tx);
+
+      const signResult = await signTransaction(tx.toXDR(), { networkPassphrase: Networks.TESTNET });
+      if (signResult.error) {
+        throw new Error(`Freighter signing failed: ${signResult.error}`);
+      }
+      const signedTx = TransactionBuilder.fromXDR(signResult.signedTxXdr, Networks.TESTNET);
+
+      const sendResponse = await server.sendTransaction(signedTx);
+      if (sendResponse.status === "ERROR") {
+        throw new Error(`Failed to send transaction: ${JSON.stringify(sendResponse.errorResult)}`);
+      }
+
+      await pollTransaction(sendResponse.hash);
+      deleteLocalRecord();
+      setSuccessMessage("Cancelled subscription successfully!");
+    } catch (err: any) {
+      setError(err.message || "Failed to submit cancel transaction");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     subscribe,
     charge,
+    cancel,
     loading,
     error,
     successMessage,
