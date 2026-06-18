@@ -3,14 +3,15 @@
 use super::*;
 use mock_yield_pool::MockYieldPool;
 use soroban_sdk::{
-    testutils::{Address as _, Ledger as _},
+    testutils::{Address as _, Ledger as _, Events as _},
     token::{StellarAssetClient, TokenClient},
-    Address, Env,
+    Address, Env, IntoVal,
 };
 
 fn setup_test<'a>(
     env: &Env,
 ) -> (
+    Address,            // admin
     Address,            // user
     Address,            // merchant
     TokenClient<'a>,    // token client
@@ -31,7 +32,7 @@ fn setup_test<'a>(
     let merchant = Address::generate(env);
 
     // Deploy SAC Token
-    let sac = env.register_stellar_asset_contract_v2(admin);
+    let sac = env.register_stellar_asset_contract_v2(admin.clone());
     let token_address = sac.address();
     let token_client = TokenClient::new(env, &token_address);
     let token_admin_client = StellarAssetClient::new(env, &token_address);
@@ -47,9 +48,10 @@ fn setup_test<'a>(
     // Deploy subscription vault
     let vault_address = env.register(SubscriptionVault, ());
     let vault_client = SubscriptionVaultClient::new(env, &vault_address);
-    vault_client.initialize(&token_address, &yield_pool_address);
+    vault_client.initialize(&token_address, &yield_pool_address, &admin);
 
     (
+        admin,
         user,
         merchant,
         token_client,
@@ -64,6 +66,7 @@ fn setup_test<'a>(
 fn test_deposit_and_yield_routing() {
     let env = Env::default();
     let (
+        _admin,
         user,
         _merchant,
         token_client,
@@ -92,6 +95,7 @@ fn test_deposit_and_yield_routing() {
 fn test_successful_merchant_charge() {
     let env = Env::default();
     let (
+        _admin,
         user,
         merchant,
         token_client,
@@ -149,6 +153,7 @@ fn test_successful_merchant_charge() {
 fn test_failed_charge_timelock() {
     let env = Env::default();
     let (
+        _admin,
         user,
         merchant,
         _token_client,
@@ -173,6 +178,7 @@ fn test_failed_charge_timelock() {
 fn test_cancel_subscription() {
     let env = Env::default();
     let (
+        _admin,
         user,
         merchant,
         _token_client,
@@ -187,4 +193,23 @@ fn test_cancel_subscription() {
 
     vault_client.cancel(&user, &merchant);
     assert!(vault_client.get_subscription(&user, &merchant).is_none());
+}
+
+#[test]
+#[should_panic]
+fn test_upgrade_contract() {
+    let env = Env::default();
+    let (
+        admin,
+        _user,
+        _merchant,
+        _token_client,
+        _vault_address,
+        vault_client,
+        _yield_pool_address,
+        _yield_pool_client,
+    ) = setup_test(&env);
+
+    let dummy_hash = soroban_sdk::BytesN::from_array(&env, &[9u8; 32]);
+    vault_client.upgrade(&dummy_hash);
 }

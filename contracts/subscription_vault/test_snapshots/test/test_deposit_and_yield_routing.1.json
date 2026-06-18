@@ -278,7 +278,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 4195
+        "live_until": 518500
       },
       {
         "entry": {
@@ -295,6 +295,18 @@
                     "wasm": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                   },
                   "storage": [
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "Admin"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD2KM"
+                      }
+                    },
                     {
                       "key": {
                         "vec": [
@@ -326,7 +338,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 4195
+        "live_until": 518500
       },
       {
         "entry": {
@@ -599,7 +611,7 @@
           },
           "ext": "v0"
         },
-        "live_until": 4195
+        "live_until": 518500
       }
     ]
   },
