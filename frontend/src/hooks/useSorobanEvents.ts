@@ -7,8 +7,8 @@ const server = new rpc.Server(RPC_URL);
 export interface SorobanEventLog {
   id: string;
   ledger: number;
-  topics: any[];
-  value: any;
+  topics: unknown[];
+  value: unknown;
 }
 
 export function useSorobanEvents(contractId: string | null, isSandbox: boolean = false) {

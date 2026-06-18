@@ -6,18 +6,25 @@ import { useWallet } from "../../hooks/useWallet";
 import { useSubscriptionVault } from "../../hooks/useSubscriptionVault";
 import { useSorobanEvents } from "../../hooks/useSorobanEvents";
 
+interface Subscription {
+  merchant: string;
+  amount: string;
+  interval: number;
+  contractId?: string;
+}
+
 export default function Manage() {
   const { publicKey, isConnected, checking, error: walletError, connectWallet, disconnectWallet, isSandbox, toggleSandbox } = useWallet();
-  const { subscribe, charge, cancel, loading: txLoading, error: txError, successMessage } = useSubscriptionVault(publicKey, isSandbox);
+  const { subscribe, charge, cancel, loading: txLoading, error: txError, successMessage, txStep } = useSubscriptionVault(publicKey, isSandbox);
 
-  const [activeSubscriptions, setActiveSubscriptions] = useState<any[]>([]);
+  const [activeSubscriptions, setActiveSubscriptions] = useState<Subscription[]>([]);
 
   useEffect(() => {
     const loadSubscriptions = () => {
       if (typeof window !== "undefined" && publicKey) {
         const stored = localStorage.getItem(`pullpay_subs_${publicKey}`) || "[]";
         try {
-          setActiveSubscriptions(JSON.parse(stored));
+          setActiveSubscriptions(JSON.parse(stored) as Subscription[]);
         } catch (e) {
           console.error(e);
         }
@@ -34,34 +41,124 @@ export default function Manage() {
     };
   }, [publicKey]);
 
-  const [contractId, setContractId] = useState("CAH4KKENIRVEE2FK64FXOUWQJPQXG4QTXBTBTNQ6WAX2TEJTIMGRB27C");
+  const [contractId, setContractId] = useState(process.env.NEXT_PUBLIC_VAULT_ID || "CA75FG2KTXN6EAG7GBFOGXRYPN3TJSNQCPISI2MRBUCNVNHTIZ2EY6XX");
   const [merchantAddress, setMerchantAddress] = useState("");
   const [amount, setAmount] = useState("");
   const [interval, setIntervalVal] = useState("");
   const [chargeUserAddress, setChargeUserAddress] = useState("");
 
+  // Validation errors
+  const [contractError, setContractError] = useState("");
+  const [merchantError, setMerchantError] = useState("");
+  const [chargeUserError, setChargeUserError] = useState("");
+
   const { events, clearEvents } = useSorobanEvents(contractId || null, isSandbox);
+
+  const validateAddress = (address: string, prefix: "G" | "C"): boolean => {
+    if (!address) return false;
+    const regex = new RegExp(`^${prefix}[A-Z2-7]{55}$`);
+    return regex.test(address);
+  };
 
   const handleSubscribeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSandbox && !contractId) {
-      alert("Yo, input the contract ID first!");
-      return;
+    setMerchantError("");
+    setContractError("");
+
+    let valid = true;
+    if (!isSandbox) {
+      if (!validateAddress(contractId, "C")) {
+        setContractError("Invalid Contract ID. Must start with 'C' and be 56 characters.");
+        valid = false;
+      }
     }
-    subscribe(contractId, merchantAddress, amount, parseInt(interval));
+    if (!validateAddress(merchantAddress, "G")) {
+      setMerchantError("Invalid Merchant Address. Must start with 'G' and be 56 characters.");
+      valid = false;
+    }
+
+    if (valid) {
+      subscribe(contractId, merchantAddress, amount, parseInt(interval));
+    }
   };
 
   const handleChargeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isSandbox && !contractId) {
-      alert("Yo, contract ID is empty!");
-      return;
-    }
+    setChargeUserError("");
+    setContractError("");
+
     if (!publicKey) {
       alert("Connect your wallet, buddy!");
       return;
     }
-    charge(contractId, publicKey, chargeUserAddress);
+
+    let valid = true;
+    if (!isSandbox) {
+      if (!validateAddress(contractId, "C")) {
+        setContractError("Invalid Contract ID. Must start with 'C' and be 56 characters.");
+        valid = false;
+      }
+    }
+    if (!validateAddress(chargeUserAddress, "G")) {
+      setChargeUserError("Invalid Subscriber Address. Must start with 'G' and be 56 characters.");
+      valid = false;
+    }
+
+    if (valid) {
+      charge(contractId, publicKey, chargeUserAddress);
+    }
+  };
+
+  // Step tracker rendering
+  const renderTxProgress = () => {
+    if (txStep === 'idle') return null;
+
+    const steps = [
+      { name: 'Preparing', key: 'preparing' },
+      { name: 'Signing', key: 'signing' },
+      { name: 'Submitting', key: 'submitting' },
+      { name: 'Polling Ledger', key: 'polling' },
+      { name: 'Completed', key: 'success' }
+    ];
+
+    const currentStepIndex = steps.findIndex(s => s.key === txStep);
+    
+    return (
+      <section className="card-elevated" style={{ borderColor: txStep === 'error' ? 'var(--color-error)' : 'var(--color-black)', marginTop: '24px' }}>
+        <h3 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span>Tx Progress</span>
+          {txStep === 'error' && <span className="chip-status error">Failed</span>}
+          {txStep === 'success' && <span className="chip-status active">Success</span>}
+          {txStep !== 'error' && txStep !== 'success' && <span className="chip-status warning">Processing</span>}
+        </h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '16px' }}>
+          {steps.map((step, idx) => {
+            let status = 'pending'; // pending, active, completed, error
+            if (txStep === 'error' && idx === currentStepIndex) {
+              status = 'error';
+            } else if (idx < currentStepIndex || txStep === 'success') {
+              status = 'completed';
+            } else if (idx === currentStepIndex) {
+              status = 'active';
+            }
+
+            return (
+              <div key={step.name} style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span className={`chip-status ${status === 'completed' ? 'active' : status === 'active' ? 'warning' : status === 'error' ? 'error' : 'default'}`} style={{ width: '130px', textAlign: 'center' }}>
+                  {step.name}
+                </span>
+                <span className="font-mono" style={{ fontSize: '14px' }}>
+                  {status === 'completed' && "✓ DONE"}
+                  {status === 'active' && "⚡ CURRENT STATE..."}
+                  {status === 'error' && "❌ FAILED"}
+                  {status === 'pending' && "○ WAITING"}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    );
   };
 
   return (
@@ -163,19 +260,29 @@ export default function Manage() {
               <input
                 id="input-vault-contract-id"
                 type="text"
-                className="input-field"
+                className={`input-field ${contractError ? 'error' : ''}`}
                 placeholder={isSandbox ? "Optional in Sandbox mode (e.g. C...)" : "e.g. C..."}
                 value={contractId}
-                onChange={(e) => setContractId(e.target.value)}
+                onChange={(e) => {
+                  setContractId(e.target.value);
+                  setContractError("");
+                }}
                 disabled={isSandbox}
               />
-              <p className="helper-text">
-                {isSandbox
-                  ? "Bypassed in Sandbox mode. Turn off Sandbox to target a live contract address."
-                  : "Enter the deployed vault contract ID (starting with C) to begin."}
-              </p>
+              {contractError ? (
+                <p className="helper-text error">{contractError}</p>
+              ) : (
+                <p className="helper-text">
+                  {isSandbox
+                    ? "Bypassed in Sandbox mode. Turn off Sandbox to target a live contract address."
+                    : "Enter the deployed vault contract ID (starting with C) to begin."}
+                </p>
+              )}
             </div>
           </section>
+
+          {/* Live step progress rendering */}
+          {renderTxProgress()}
 
           {/* Section 5: Transaction Notifications */}
           {(txError || successMessage) && (
@@ -226,7 +333,7 @@ export default function Manage() {
                       <strong>Ledger #{e.ledger}</strong> - Tx: {e.id.substring(0, 12)}...
                       <br />
                       <span style={{ fontSize: "13px", color: "var(--color-text-secondary)" }}>
-                        Charged: {e.value.toString()} tokens
+                        Charged: {String(e.value)} tokens
                       </span>
                     </li>
                   ))}
@@ -252,13 +359,20 @@ export default function Manage() {
                 <input
                   id="input-merchant-address"
                   type="text"
-                  className="input-field"
+                  className={`input-field ${merchantError ? 'error' : ''}`}
                   placeholder="G..."
                   value={merchantAddress}
-                  onChange={(e) => setMerchantAddress(e.target.value)}
+                  onChange={(e) => {
+                    setMerchantAddress(e.target.value);
+                    setMerchantError("");
+                  }}
                   required
                 />
-                <p className="helper-text">The public key address of the merchant.</p>
+                {merchantError ? (
+                  <p className="helper-text error">{merchantError}</p>
+                ) : (
+                  <p className="helper-text">The public key address of the merchant.</p>
+                )}
               </div>
 
               <div className="input-group">
@@ -319,7 +433,7 @@ export default function Manage() {
                   </p>
                 ) : (
                   <ul className="list-raw">
-                    {activeSubscriptions.map((sub: any, index: number) => (
+                    {activeSubscriptions.map((sub: Subscription, index: number) => (
                       <li key={index} className="list-item-raw" style={{ display: "flex", flexDirection: "column", gap: "12px", borderBottom: "3px solid black", padding: "16px 0" }}>
                         <div className="font-mono" style={{ fontSize: "14px", wordBreak: "break-all" }}>
                           <strong>Merchant:</strong> {sub.merchant}
@@ -359,13 +473,20 @@ export default function Manage() {
                 <input
                   id="input-charge-user-address"
                   type="text"
-                  className="input-field"
+                  className={`input-field ${chargeUserError ? 'error' : ''}`}
                   placeholder="G..."
                   value={chargeUserAddress}
-                  onChange={(e) => setChargeUserAddress(e.target.value)}
+                  onChange={(e) => {
+                    setChargeUserAddress(e.target.value);
+                    setChargeUserError("");
+                  }}
                   required
                 />
-                <p className="helper-text">Subscriber address who has active subscription.</p>
+                {chargeUserError ? (
+                  <p className="helper-text error">{chargeUserError}</p>
+                ) : (
+                  <p className="helper-text">Subscriber address who has active subscription.</p>
+                )}
               </div>
 
               <button

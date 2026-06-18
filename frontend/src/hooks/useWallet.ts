@@ -1,64 +1,49 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { isConnected as checkFreighterConnected, getAddress, getNetworkDetails, requestAccess } from "@stellar/freighter-api";
 
 export function useWallet() {
-  const [publicKey, setPublicKey] = useState<string | null>(null);
-  const [walletConnected, setWalletConnected] = useState<boolean>(false);
-  const [checking, setChecking] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isSandbox, setIsSandbox] = useState<boolean>(false);
+  const [isSandbox, setIsSandbox] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("pullpay_sandbox") === "true";
+    }
+    return false;
+  });
 
-  // Sync initial sandbox status if in client environment
-  useEffect(() => {
+  const [publicKey, setPublicKey] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("pullpay_sandbox");
       if (stored === "true") {
-        setIsSandbox(true);
-        setPublicKey("GD_SANDBOX_USER_MOCK_WALLET_ADDRESS_6789");
-        setWalletConnected(true);
-      } else {
-        const disconnected = localStorage.getItem("pullpay_disconnected") === "true";
-        if (!disconnected) {
-          checkConnection(true);
-        }
+        return "GD_SANDBOX_USER_MOCK_WALLET_ADDRESS_6789";
       }
     }
-  }, []);
+    return null;
+  });
 
-  const toggleSandbox = (enable: boolean) => {
-    setIsSandbox(enable);
+  const [walletConnected, setWalletConnected] = useState<boolean>(() => {
     if (typeof window !== "undefined") {
-      if (enable) {
-        localStorage.setItem("pullpay_sandbox", "true");
-        setPublicKey("GD_SANDBOX_USER_MOCK_WALLET_ADDRESS_6789");
-        setWalletConnected(true);
-        setError(null);
-      } else {
-        localStorage.removeItem("pullpay_sandbox");
-        setPublicKey(null);
-        setWalletConnected(false);
-      }
+      return localStorage.getItem("pullpay_sandbox") === "true";
     }
-  };
+    return false;
+  });
 
-  const checkConnection = async (isInitial = false) => {
+  const [checking, setChecking] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const checkConnection = useCallback(async (isInitial = false) => {
     if (isSandbox) return;
     if (typeof window !== "undefined" && localStorage.getItem("pullpay_disconnected") === "true") {
       return;
     }
     try {
       const status = await checkFreighterConnected();
-      // Freighter API returns { isConnected: boolean } object, not raw boolean
       const connected = status && status.isConnected;
       if (connected) {
         const { address, error: addressError } = await getAddress();
         if (addressError || !address) {
-          // Gracefully reset state without flashing authorization errors on load/poll
           setPublicKey(null);
           setWalletConnected(false);
           return;
         }
-        // Check network
         const networkDetails = await getNetworkDetails();
         if (networkDetails.network !== "TESTNET") {
           setError("Switch Freighter to TESTNET in settings!");
@@ -73,10 +58,38 @@ export function useWallet() {
         setWalletConnected(false);
         setPublicKey(null);
       }
-    } catch (err: any) {
-      // Ignore background check errors unless user has established connection
+    } catch (err: unknown) {
       if (isInitial || walletConnected) {
-        setError(err.message || "Failed to check Freighter wallet status");
+        setError(err instanceof Error ? err.message : "Failed to check Freighter wallet status");
+      }
+    }
+  }, [isSandbox, walletConnected]);
+
+  // Sync initial sandbox status if in client environment
+  useEffect(() => {
+    if (typeof window !== "undefined" && !isSandbox) {
+      const disconnected = localStorage.getItem("pullpay_disconnected") === "true";
+      if (!disconnected) {
+        const timer = setTimeout(() => {
+          checkConnection(true);
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isSandbox, checkConnection]);
+
+  const toggleSandbox = (enable: boolean) => {
+    setIsSandbox(enable);
+    if (typeof window !== "undefined") {
+      if (enable) {
+        localStorage.setItem("pullpay_sandbox", "true");
+        setPublicKey("GD_SANDBOX_USER_MOCK_WALLET_ADDRESS_6789");
+        setWalletConnected(true);
+        setError(null);
+      } else {
+        localStorage.removeItem("pullpay_sandbox");
+        setPublicKey(null);
+        setWalletConnected(false);
       }
     }
   };
@@ -97,7 +110,6 @@ export function useWallet() {
         return;
       }
       
-      // CRITICAL: Call requestAccess() instead of getAddress() to show the authorization popup
       const { address, error: addressError } = await requestAccess();
       if (addressError) {
         setError(addressError);
@@ -119,8 +131,8 @@ export function useWallet() {
       setPublicKey(address);
       setWalletConnected(true);
       setError(null);
-    } catch (err: any) {
-      setError(err.message || "Failed to connect Freighter wallet");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to connect Freighter wallet");
     } finally {
       setChecking(false);
     }
@@ -140,7 +152,7 @@ export function useWallet() {
       const interval = setInterval(() => checkConnection(false), 3000);
       return () => clearInterval(interval);
     }
-  }, [isSandbox]);
+  }, [isSandbox, checkConnection]);
 
   return {
     publicKey,
