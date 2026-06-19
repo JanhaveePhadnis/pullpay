@@ -514,7 +514,7 @@ export default function Manage() {
       {/* Header Band */}
       <header className="header-band">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: "16px" }}>
-          <h1>PullPay Subscription Protocol</h1>
+          <h1>Manage Subscriptions</h1>
           <Link href="/" id="link-back-home" className="btn btn-ghost btn-sm">
             ← Back to Home
           </Link>
@@ -533,7 +533,7 @@ export default function Manage() {
         <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
           {/* Card 1: Wallet Connection & Faucet */}
           <section className="card-default">
-            <h3>1. Wallet & Faucet</h3>
+            <h3>1. Wallet Connection</h3>
             <div style={{ marginTop: "16px" }}>
               {checking && <p className="font-mono">Checking connection status...</p>}
               {isConnected ? (
@@ -817,7 +817,7 @@ export default function Manage() {
 
               {/* Create Subscription Form */}
               <section className="card-elevated">
-                <h3>Create Subscription</h3>
+                <h3>3. Create Subscription</h3>
                 <p className="font-mono" style={{ fontSize: "14px", marginTop: "8px", marginBottom: "16px", color: "var(--color-text-secondary)" }}>
                   Authorize a merchant to pull repeating payments.
                 </p>
