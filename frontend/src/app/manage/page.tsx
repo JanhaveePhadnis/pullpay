@@ -1,6 +1,7 @@
+/* eslint-disable react-hooks/set-state-in-effect */
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useWallet } from "../../hooks/useWallet";
 import { useSubscriptionVault } from "../../hooks/useSubscriptionVault";
@@ -9,6 +10,13 @@ import { rpc } from "@stellar/stellar-sdk";
 
 interface Subscription {
   merchant: string;
+  amount: string;
+  interval: number;
+  contractId?: string;
+}
+
+interface MerchantSubscriber {
+  subscriber: string;
   amount: string;
   interval: number;
   contractId?: string;
@@ -126,14 +134,14 @@ export default function Manage() {
   }, [loadSubscriptions]);
 
   // Merchant subscriber directory
-  const [merchantSubscribers, setMerchantSubscribers] = useState<any[]>([]);
+  const [merchantSubscribers, setMerchantSubscribers] = useState<MerchantSubscriber[]>([]);
 
   const refreshMerchantSubscribers = useCallback(() => {
     if (!publicKey) {
       setMerchantSubscribers([]);
       return;
     }
-    const list: any[] = [];
+    const list: MerchantSubscriber[] = [];
     if (typeof window !== "undefined") {
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -252,7 +260,7 @@ export default function Manage() {
     }
   };
 
-  const handleDirectPull = (sub: any) => {
+  const handleDirectPull = (sub: MerchantSubscriber) => {
     setChargeUserError("");
     setContractError("");
     setActiveTxType("charge");
@@ -297,8 +305,8 @@ export default function Manage() {
       const account = await serverInstance.getAccount(publicKey);
       const deployerAddr = "GC5HL2KXTCEXGZU4N6QIDQLIXW6HSFYEZV7ELAEEHDL4EHUMVSTZCPX6";
       
-      const balances = (account as any).balances || [];
-      const hasTrust = balances.some((b: any) => b.asset_code === "USDC" && b.asset_issuer === deployerAddr);
+      const balances = (account as unknown as { balances: Array<{ asset_code: string; asset_issuer: string }> }).balances || [];
+      const hasTrust = balances.some((b: { asset_code: string; asset_issuer: string }) => b.asset_code === "USDC" && b.asset_issuer === deployerAddr);
 
       if (!hasTrust) {
         setSuccessMessage("Establishing trustline for USDC...");
@@ -307,7 +315,7 @@ export default function Manage() {
         const { signTransaction: signTx } = await import("@stellar/freighter-api");
         const asset = new Asset("USDC", deployerAddr);
         const op = Operation.changeTrust({ asset });
-        let tx = new TransactionBuilder(account, {
+        const tx = new TransactionBuilder(account, {
           fee: "100",
           networkPassphrase: Networks.TESTNET,
         })
@@ -355,8 +363,8 @@ export default function Manage() {
       setSuccessMessage("Minted 100 USDC on Stellar Testnet successfully!");
       setTxStep('success');
       window.dispatchEvent(new CustomEvent("pullpay_balance_updated"));
-    } catch (err: any) {
-      setTxError(err.message || "Minting failed");
+    } catch (err: unknown) {
+      setTxError(err instanceof Error ? err.message : "Minting failed");
       setTxStep('error');
     }
   };
@@ -810,7 +818,7 @@ export default function Manage() {
                         {txLoading && activeTxType === 'deposit' ? "PENDING" : "DEPOSIT"}
                       </button>
                     </div>
-                    <p className="helper-text">This will call the vault's on-chain deposit method.</p>
+                    <p className="helper-text">This will call the vault&apos;s on-chain deposit method.</p>
                   </div>
                 </form>
               </section>
@@ -995,7 +1003,6 @@ export default function Manage() {
 
                     {/* Chart Bars */}
                     {chartData.map((data, idx) => {
-                      const totalWidth = 300; // approximation
                       const barWidth = 35;
                       const xPos = 45 + idx * 50;
                       // Height scale: 120 is y-axis base, max value is 150 = height of 100px

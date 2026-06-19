@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { rpc, TransactionBuilder, Networks, Address, Contract, nativeToScVal, scValToNative, xdr } from "@stellar/stellar-sdk";
+import { rpc, TransactionBuilder, Networks, Address, Contract, nativeToScVal, scValToNative } from "@stellar/stellar-sdk";
 import { signTransaction } from "@stellar/freighter-api";
 
 const RPC_URL = "https://soroban-testnet.stellar.org";
@@ -458,7 +458,7 @@ export function useSubscriptionVault(publicKey: string | null, isSandbox: boolea
         new Address(address).toScVal()
       );
 
-      let tx = new TransactionBuilder(dummyAccount, {
+      const tx = new TransactionBuilder(dummyAccount, {
         fee: "100",
         networkPassphrase: Networks.TESTNET,
       })
@@ -500,7 +500,7 @@ export function useSubscriptionVault(publicKey: string | null, isSandbox: boolea
         new Address(address).toScVal()
       );
 
-      let tx = new TransactionBuilder(dummyAccount, {
+      const tx = new TransactionBuilder(dummyAccount, {
         fee: "100",
         networkPassphrase: Networks.TESTNET,
       })
