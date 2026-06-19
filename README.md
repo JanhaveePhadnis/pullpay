@@ -22,6 +22,19 @@ The project is built using a raw brutalist aesthetic, focusing on robust, produc
 
 ---
 
+> [!IMPORTANT]
+> ### 🚀 HACKATHON FEATURE HIGHLIGHTS (PULLPAY v2)
+> We have added the following premium features to impress judges and provide a complete, functional Web3 user experience:
+> 
+> *   **One-Click USDC Token Faucet (Freighter & Sandbox):** Checks for a trustline to the custom USDC asset and registers it via Freighter if missing, then calls our Next.js API faucet route (`/api/faucet`) to mint 100 USDC to the user's wallet.
+> *   **Vault Funding & Balance Management (On-Chain Deposits):** Complete support for querying on-chain vault balances and depositing custom USDC amounts via Freighter.
+> *   **Yield Accrual Calculator & Visualizer:** Simulates active yield routing (80%) to the Mock Yield Pool, featuring a live ticker compounding at 5% APY every 100ms, and a visual flowchart of the recall mechanism.
+> *   **Interactive Transaction Simulator:** An animated execution flowchart showing internal contract operations (`Authorize` ➡️ `Deduct` ➡️ `Recall` ➡️ `Transfer`) that lights up step-by-step to match live RPC transaction phases.
+> *   **Ledger-to-Time Frequency Helper (Stellar UX):** Translates raw ledger counts to human-readable times (based on 5-second block times) and offers standard preset buttons (1m, 1h, 1d, 1mo).
+> *   **Merchant Dashboard & Subscriber Directory:** Lists all subscribers who have authorized the merchant with direct "Pull Payment" buttons, active analytics, and a brutalist SVG chart displaying recurring revenue over time.
+
+---
+
 ## 🛠️ Technical Implementations & Requirements
 
 ### 1. Advanced Smart Contract Development
