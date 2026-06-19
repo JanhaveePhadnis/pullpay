@@ -23,7 +23,7 @@ The project is built using a raw brutalist aesthetic, focusing on robust, produc
 ---
 
 > [!IMPORTANT]
-> ### 🚀 HACKATHON FEATURE HIGHLIGHTS (PULLPAY v2)
+
 > We have added the following premium features to impress judges and provide a complete, functional Web3 user experience:
 > 
 > *   **One-Click USDC Token Faucet (Freighter & Sandbox):** Checks for a trustline to the custom USDC asset and registers it via Freighter if missing, then calls our Next.js API faucet route (`/api/faucet`) to mint 100 USDC to the user's wallet.
