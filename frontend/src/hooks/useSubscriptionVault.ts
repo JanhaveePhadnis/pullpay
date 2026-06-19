@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { rpc, TransactionBuilder, Networks, Address, Contract, nativeToScVal } from "@stellar/stellar-sdk";
+import { rpc, TransactionBuilder, Networks, Address, Contract, nativeToScVal, scValToNative, xdr } from "@stellar/stellar-sdk";
 import { signTransaction } from "@stellar/freighter-api";
 
 const RPC_URL = "https://soroban-testnet.stellar.org";
@@ -344,13 +344,195 @@ export function useSubscriptionVault(publicKey: string | null, isSandbox: boolea
     }
   };
 
+  const deposit = async (
+    contractId: string,
+    amountUsdc: string
+  ) => {
+    if (!publicKey) {
+      setError("Please connect your wallet first!");
+      setTxStep('error');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+    setTxStep('preparing');
+
+    const amountStroops = BigInt(Math.round(parseFloat(amountUsdc) * 10000000));
+
+    if (isSandbox) {
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        setTxStep('signing');
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        setTxStep('submitting');
+        await new Promise((resolve) => setTimeout(resolve, 500));
+
+        // Update sandbox mock balance
+        if (typeof window !== "undefined") {
+          const balanceKey = `pullpay_sandbox_balance_${publicKey}`;
+          const currentBal = parseFloat(localStorage.getItem(balanceKey) || "0");
+          const newBal = currentBal + parseFloat(amountUsdc);
+          localStorage.setItem(balanceKey, String(newBal));
+
+          // Also reduce mock wallet balance
+          const walletBalKey = `pullpay_sandbox_wallet_balance_${publicKey}`;
+          const currentWalletBal = parseFloat(localStorage.getItem(walletBalKey) || "100.00");
+          localStorage.setItem(walletBalKey, String(Math.max(0, currentWalletBal - parseFloat(amountUsdc))));
+
+          window.dispatchEvent(new CustomEvent("pullpay_balance_updated"));
+        }
+
+        setSuccessMessage(`Deposited ${amountUsdc} USDC successfully (Sandbox Mock Tx)!`);
+        setTxStep('success');
+      } catch (err: unknown) {
+        setError(mapTxError(err));
+        setTxStep('error');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    try {
+      const sourceAccount = await server.getAccount(publicKey);
+      const contract = new Contract(contractId);
+      const operation = contract.call(
+        "deposit",
+        new Address(publicKey).toScVal(),
+        nativeToScVal(amountStroops, { type: "i128" })
+      );
+
+      let tx = new TransactionBuilder(sourceAccount, {
+        fee: "100",
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(operation)
+        .setTimeout(30)
+        .build();
+
+      tx = await server.prepareTransaction(tx);
+
+      setTxStep('signing');
+      const signResult = await signTransaction(tx.toXDR(), { networkPassphrase: Networks.TESTNET });
+      if (signResult.error) {
+        throw new Error(`Freighter signing failed: ${signResult.error}`);
+      }
+      const signedTx = TransactionBuilder.fromXDR(signResult.signedTxXdr, Networks.TESTNET);
+
+      setTxStep('submitting');
+      const sendResponse = await server.sendTransaction(signedTx);
+      if (sendResponse.status === "ERROR") {
+        throw new Error(`Failed to send transaction: ${JSON.stringify(sendResponse.errorResult)}`);
+      }
+
+      setTxStep('polling');
+      await pollTransaction(sendResponse.hash);
+      setSuccessMessage(`Deposited ${amountUsdc} USDC successfully!`);
+      setTxStep('success');
+      
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("pullpay_balance_updated"));
+      }
+    } catch (err: unknown) {
+      setError(mapTxError(err));
+      setTxStep('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getVaultBalance = async (contractId: string, address: string): Promise<string> => {
+    if (isSandbox) {
+      if (typeof window !== "undefined") {
+        return localStorage.getItem(`pullpay_sandbox_balance_${address}`) || "0.00";
+      }
+      return "0.00";
+    }
+
+    try {
+      const dummyAccount = await server.getAccount(address);
+      const contract = new Contract(contractId);
+      const operation = contract.call(
+        "get_balance",
+        new Address(address).toScVal()
+      );
+
+      let tx = new TransactionBuilder(dummyAccount, {
+        fee: "100",
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(operation)
+        .setTimeout(30)
+        .build();
+
+      const simRes = await server.simulateTransaction(tx);
+      if (rpc.Api.isSimulationSuccess(simRes) && simRes.result?.retval) {
+        const val = scValToNative(simRes.result.retval);
+        return (Number(val) / 10000000).toFixed(2);
+      }
+      return "0.00";
+    } catch (e) {
+      console.error("Failed to fetch vault balance:", e);
+      return "0.00";
+    }
+  };
+
+  const getUsdcBalance = async (tokenId: string, address: string): Promise<string> => {
+    if (isSandbox) {
+      if (typeof window !== "undefined") {
+        const walletBalKey = `pullpay_sandbox_wallet_balance_${address}`;
+        let bal = localStorage.getItem(walletBalKey);
+        if (bal === null) {
+          localStorage.setItem(walletBalKey, "100.00");
+          bal = "100.00";
+        }
+        return parseFloat(bal).toFixed(2);
+      }
+      return "100.00";
+    }
+
+    try {
+      const dummyAccount = await server.getAccount(address);
+      const contract = new Contract(tokenId);
+      const operation = contract.call(
+        "balance",
+        new Address(address).toScVal()
+      );
+
+      let tx = new TransactionBuilder(dummyAccount, {
+        fee: "100",
+        networkPassphrase: Networks.TESTNET,
+      })
+        .addOperation(operation)
+        .setTimeout(30)
+        .build();
+
+      const simRes = await server.simulateTransaction(tx);
+      if (rpc.Api.isSimulationSuccess(simRes) && simRes.result?.retval) {
+        const val = scValToNative(simRes.result.retval);
+        return (Number(val) / 10000000).toFixed(2);
+      }
+      return "0.00";
+    } catch (e) {
+      console.error("Failed to fetch USDC balance:", e);
+      return "0.00";
+    }
+  };
+
   return {
     subscribe,
     charge,
     cancel,
+    deposit,
+    getVaultBalance,
+    getUsdcBalance,
     loading,
     error,
     successMessage,
     txStep,
+    setTxStep,
+    setError,
+    setSuccessMessage,
   };
 }

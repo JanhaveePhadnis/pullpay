@@ -3,9 +3,9 @@
 use super::*;
 use mock_yield_pool::MockYieldPool;
 use soroban_sdk::{
-    testutils::{Address as _, Ledger as _, Events as _},
+    testutils::{Address as _, Ledger as _},
     token::{StellarAssetClient, TokenClient},
-    Address, Env, IntoVal,
+    Address, Env,
 };
 
 fn setup_test<'a>(
@@ -200,7 +200,7 @@ fn test_cancel_subscription() {
 fn test_upgrade_contract() {
     let env = Env::default();
     let (
-        admin,
+        _admin,
         _user,
         _merchant,
         _token_client,

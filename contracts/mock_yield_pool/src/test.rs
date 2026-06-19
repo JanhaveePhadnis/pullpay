@@ -2,9 +2,9 @@
 
 use super::*;
 use soroban_sdk::{
-    testutils::{Address as _, Events as _},
+    testutils::Address as _,
     token::{StellarAssetClient, TokenClient},
-    Address, Env, IntoVal,
+    Address, Env,
 };
 
 fn setup_test<'a>(env: &Env) -> (Address, TokenClient<'a>, Address, MockYieldPoolClient<'a>) {
