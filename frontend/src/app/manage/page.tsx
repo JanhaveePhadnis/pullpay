@@ -303,7 +303,7 @@ export default function Manage() {
       if (!hasTrust) {
         setSuccessMessage("Establishing trustline for USDC...");
         setTxStep('signing');
-        const { Asset, Operation, TransactionBuilder, Networks, signTransaction } = await import("@stellar/stellar-sdk");
+        const { Asset, Operation, TransactionBuilder, Networks } = await import("@stellar/stellar-sdk");
         const { signTransaction: signTx } = await import("@stellar/freighter-api");
         const asset = new Asset("USDC", deployerAddr);
         const op = Operation.changeTrust({ asset });
