@@ -141,6 +141,14 @@ Open [http://localhost:3000](http://localhost:3000) to view it.
 ## 📸 Proof of Verification & Screenshots
 
 Below are proof of compliance screenshots for the submission requirements:
+<img width="1469" height="873" alt="Screenshot 2026-06-19 at 9 45 20 AM" src="https://github.com/user-attachments/assets/ad5be1a4-07ce-4aa0-89e2-ee92240fe1f8" />
+<img width="1469" height="861" alt="Screenshot 2026-06-19 at 9 45 30 AM" src="https://github.com/user-attachments/assets/3887b443-e568-45af-89ba-33e82f4b210c" />
+<img width="701" height="809" alt="Screenshot 2026-06-19 at 9 45 37 AM" src="https://github.com/user-attachments/assets/cdf9fa0c-2d4a-4a9f-b988-05e5707ea343" />
+mobile screenshots-
+<img width="384" height="775" alt="Screenshot 2026-06-19 at 9 45 47 AM" src="https://github.com/user-attachments/assets/b1769d03-ef42-4f97-a72c-84aa4777a998" />
+<img width="396" height="779" alt="Screenshot 2026-06-19 at 9 45 54 AM" src="https://github.com/user-attachments/assets/e196b396-43fb-4a4b-81ac-f87fc8b2f067" />
+<img width="400" height="775" alt="Screenshot 2026-06-19 at 9 46 06 AM" src="https://github.com/user-attachments/assets/a5077184-b971-4c37-a92c-97cc5c1751d7" />
+
 
 ### 📱 1. Mobile Responsive UI
 ![Mobile Responsive Dashboard Layout](https://placehold.co/800x450/000000/FFFFFF/png?text=Mobile+Responsive+Dashboard+Screenshot)
@@ -156,5 +164,3 @@ Below are proof of compliance screenshots for the submission requirements:
 
 ---
 
-## 🎥 Demo Video Link
-*   **Video Walkthrough (1-2 minutes):** [Demo Presentation Link](https://placehold.co/800x450/000000/FFFFFF/png?text=Demo+Video+Placeholder)
